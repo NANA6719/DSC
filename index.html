@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>파킹히어로즈</title>
+    <style>
+        /* 기본 스타일 */
+        .map_wrap, .map_wrap * {margin:0;padding:0;font-family:'Malgun Gothic',dotum,'돋움',sans-serif;font-size:12px;}
+        .map_wrap {position:relative;width:100%;height:100vh;display:flex;}
+        #map {flex:1;height:100%;}
+
+        /* 상단 검색 폼 스타일 */ 
+        #searchForm {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            width: 70%;
+            transform: translateX(-50%);
+            background: rgba(255, 255, 255);
+            padding: 10px;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+            z-index: 2;
+        }
+
+        /* 검색 키워드 입력 필드 스타일 */
+        #searchKeyword {
+            width: 60%; /* 길이를 원하는 만큼 조정 (예: 200px) */
+            padding: 5px; /* 여백 추가 */
+            border: 1px solid #ddd; /* 테두리 스타일 */
+            border-radius: 5px; /* 모서리 둥글게 */
+        }
+
+        /* 바텀시트 */
+        #menu_wrap {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 150px; /* 기본 높이 */
+            background: rgba(255, 255, 255);
+            transition: height 0.3s ease;
+            border-top-left-radius: 15px;
+            border-top-right-radius: 15px;
+            overflow: hidden; /* 바텀시트 전체의 스크롤 제거 */
+            z-index: 10;
+            display: none;
+        }
+
+        /* 슬라이딩 가능성을 나타내는 회색 바 */
+        .drag-bar {
+            width: 40px;
+            height: 5px;
+            background-color: #ccc; /* 회색 */
+            border-radius: 5px;
+            margin: 10px auto; /* 중앙 정렬 */
+            cursor: grab; /* 드래그 커서 */
+        }
+
+        /* 목록의 스크롤 */
+        #placesList {
+            max-height: calc(100% - 50px); /* 바텀시트 높이에 맞춤 (회색 바 높이 고려) */
+            overflow-y: auto; /* 목록 스크롤 활성화 */
+            padding: 10px;
+            box-sizing: border-box;
+        }
+
+        /* 펼쳐진 상태에서의 스타일 */
+        #menu_wrap.expanded {
+            height: 300px; /* 확장된 높이 */
+            transition: height 0.3s ease;
+        }
+
+        #placesList {
+            padding: 0;
+            margin: 0;
+            list-style: none;
+        }
+
+        #placesList .item {
+            margin-bottom: 10px;
+            padding: 10px;
+            border-bottom: 1px solid #ddd;
+        }
+        .bg_white {background:#fff;}
+        #menu_wrap hr {display: block; height: 1px;border: 0; border-top: 2px solid #5F5F5F;margin:3px 0;}
+        #menu_wrap .option{text-align: center;}
+        #menu_wrap .option p {margin:10px 0;}  
+        #menu_wrap .option button {margin-left:5px;}
+        #placesList li {list-style: none;}
+        #placesList .item {position:relative;border-bottom:1px solid #888;overflow: hidden;cursor: pointer;min-height: 65px;}
+        #placesList .item span {display: block;margin-top:4px;}
+        #placesList .item h5, #placesList .item .info {text-overflow: ellipsis;overflow: hidden;white-space: nowrap;}
+        #placesList .item .info{padding:10px 0 10px 55px;}
+        #placesList .info .gray {color:#8a8a8a;}
+        #placesList .info .jibun {
+            padding-left:26px;
+            background:url(https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/places_jibun.png) no-repeat;
+        }
+
+        #placesList .info .tel {color:#009900;}
+        #placesList .item .markerbg {
+            float:left;
+            position:absolute;
+            width:36px; 
+            height:37px;
+            margin:10px 0 0 10px;
+            background:url(https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/marker_number_blue.png) no-repeat;
+        }
+        #placesList .item .marker_1 {background-position: 0 -10px;}
+        #placesList .item .marker_2 {background-position: 0 -56px;}
+        #placesList .item .marker_3 {background-position: 0 -102px}
+        #placesList .item .marker_4 {background-position: 0 -148px;}
+        #placesList .item .marker_5 {background-position: 0 -194px;}
+        #placesList .item .marker_6 {background-position: 0 -240px;}
+        #placesList .item .marker_7 {background-position: 0 -286px;}
+        #placesList .item .marker_8 {background-position: 0 -332px;}
+        #placesList .item .marker_9 {background-position: 0 -378px;}
+        #placesList .item .marker_10 {background-position: 0 -423px;}
+        #placesList .item .marker_11 {background-position: 0 -470px;}
+        #placesList .item .marker_12 {background-position: 0 -516px;}
+        #placesList .item .marker_13 {background-position: 0 -562px;}
+        #placesList .item .marker_14 {background-position: 0 -608px;}
+        #placesList .item .marker_15 {background-position: 0 -654px;}
+        #pagination {margin:10px auto;text-align: center;}
+        #pagination a {display:inline-block;margin-right:10px;}
+        #pagination .on {font-weight: bold; cursor: default;color:#777;}
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            font-family: 'Malgun Gothic', '돋움', sans-serif;
+        }
+
+        #pagination {
+            text-align: center;
+            margin: 10px 0;
+        }
+        /* 반응형 스타일 */
+        @media (max-width: 600px) {
+            #searchForm {
+                width: 90%; /* 작은 화면에서 검색 폼 너비 조정 */
+            }
+
+            #menu_wrap {
+                height: 150px; /* 기본 높이 */
+            }
+
+            #menu_wrap.expanded {
+                height: 250px; /* 확장된 높이 조정 */
+            }
+        }
+
+        @media (max-width: 400px) {
+            #searchForm {
+                font-size: 10px; /* 작은 화면에서 폰트 크기 조정 */
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="map_wrap">
+        <div id="map"></div>
+        <div id="menu_wrap">
+            <div class="drag-bar" id="dragBar"></div>
+            <ul id="placesList"></ul>
+            <div id="pagination"></div>
+        </div>
+    </div>
+
+    <div id="searchForm">
+        <form onsubmit="searchPlaceAndParking(); return false;">
+            장소 검색: <input type="text" id="searchKeyword" size="15">
+            <button type="submit">검색하기</button> 
+        </form>
+    </div>
+
+    <script type="text/javascript" src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=7973dbfee6a7e6884c571a0a617291ef&libraries=services"></script>
+    <script>
+        var markers = []; // 마커를 담을 배열
+        var mapContainer = document.getElementById('map');
+        var mapOption = {
+            center: new kakao.maps.LatLng(36.3578, 127.3867),
+            level: 3
+        };
+
+        // 지도를 생성합니다
+        var map = new kakao.maps.Map(mapContainer, mapOption);
+        var infowindow = new kakao.maps.InfoWindow({zIndex:1});
+        var ps = new kakao.maps.services.Places();
+
+        // 바텀시트 슬라이딩 기능
+        var menuWrap = document.getElementById('menu_wrap');
+        var dragBar = document.getElementById('dragBar');
+        var startY, isDragging = false;
+        var maxHeight = 400; // 최대 높이
+        var minHeight = 150; // 최소 높이
+
+        // 현재 바텀시트 상태
+        var isExpanded = false;
+
+        // 드래그 시작 (마우스)
+        dragBar.addEventListener('mousedown', function(e) {
+            startY = e.clientY; // 시작 Y 좌표
+            isDragging = true;
+        });
+
+        // 드래그 시작 (터치)
+        dragBar.addEventListener('touchstart', function(e) {
+            startY = e.touches[0].clientY; // 시작 Y 좌표
+            isDragging = true;
+        });
+
+        // 드래그 종료 (마우스)
+        document.addEventListener('mouseup', function() {
+            if (isDragging) {
+                toggleMenu(); // 상태 토글
+            }
+            isDragging = false;
+        });
+
+        // 드래그 종료 (터치)
+        document.addEventListener('touchend', function() {
+            if (isDragging) {
+                toggleMenu(); // 상태 토글
+            }
+            isDragging = false;
+        });
+
+        // 드래그 중 (마우스)
+        document.addEventListener('mousemove', function(e) {
+            if (isDragging) {
+                var deltaY = startY - e.clientY; // 이동 거리
+                // 위로 드래그
+                if (deltaY > 0 && !isExpanded) {
+                    menuWrap.style.height = maxHeight + 'px'; // 최대 높이로 설정
+                }
+                // 아래로 드래그
+                else if (deltaY < 0 && isExpanded) {
+                    menuWrap.style.height = minHeight + 'px'; // 최소 높이로 설정
+                }
+            }
+        });
+
+        // 드래그 중 (터치)
+        document.addEventListener('touchmove', function(e) {
+            if (isDragging) {
+                var deltaY = startY - e.touches[0].clientY; // 이동 거리
+                // 위로 드래그
+                if (deltaY > 0 && !isExpanded) {
+                    menuWrap.style.height = maxHeight + 'px'; // 최대 높이로 설정
+                }
+                // 아래로 드래그
+                else if (deltaY < 0 && isExpanded) {
+                    menuWrap.style.height = minHeight + 'px'; // 최소 높이로 설정
+                }
+            }
+        });
+
+        // 상태 토글 함수
+        function toggleMenu() {
+            if (isExpanded) {
+                menuWrap.style.height = minHeight + 'px'; // 최소 높이로 설정
+            } else {
+                menuWrap.style.height = maxHeight + 'px'; // 최대 높이로 설정
+            }
+            isExpanded = !isExpanded; // 상태 반전
+        }
+
+
+
+        // 검색한 장소와 주변 주차장을 검색하는 함수
+        function searchPlaceAndParking() {
+            var keyword = document.getElementById('searchKeyword').value;
+
+            if (!keyword.trim()) {
+                alert('장소를 입력하세요!');
+                return;
+            }
+
+            // 장소 검색
+            ps.keywordSearch(keyword, function(data, status) {
+                if (status === kakao.maps.services.Status.OK) {
+                    var place = data[0];  // 첫 번째 결과 선택
+                    
+                    var center = new kakao.maps.LatLng(place.y, place.x);
+                    arriveMarke(place.y,place.x);
+                    map.setCenter(center);
+
+                    // 바텀시트 보이기
+                    document.getElementById('menu_wrap').style.display = 'block';
+
+                    // 장소 주변 주차장 검색
+                    searchNearbyParking(center);
+                } else if (status === kakao.maps.services.Status.ZERO_RESULT) {
+                    alert('검색 결과가 없습니다.');
+                } else if (status === kakao.maps.services.Status.ERROR) {
+                    alert('검색 중 오류가 발생했습니다.');
+                }
+            });
+        }
+
+        // 주차장 카테고리로 주변 장소 검색
+        function searchNearbyParking(center) {
+            var places = new kakao.maps.services.Places();
+
+            places.categorySearch('PK6', function(data, status, pagination) {
+                if (status === kakao.maps.services.Status.OK) {
+                    displayPlaces(data);
+                    displayPagination(pagination);
+                } else if (status === kakao.maps.services.Status.ZERO_RESULT) {
+                    alert('주변에 주차장이 없습니다.');
+                }
+            }, {
+                location: center,
+                radius: 1000  // 검색 반경 1km
+            });
+        }
+
+        // 마커를 추가하는 함수
+        function addMarker(position, idx) {
+            var imageSrc = 'https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/marker_number_blue.png';
+            var imageSize = new kakao.maps.Size(36, 44);  // 마커의 이미지 크기를 44px로 설정
+            var imgOptions = {
+                spriteSize: new kakao.maps.Size(36, 691),  // 스프라이트 이미지의 전체 크기
+                spriteOrigin: new kakao.maps.Point(0, idx * 46), // 각 마커의 스프라이트 위치 계산
+                offset: new kakao.maps.Point(14, 42)  // 마커의 이미지가 잘리지 않도록 오프셋 설정
+            };
+
+            var markerImage = new kakao.maps.MarkerImage(imageSrc, imageSize, imgOptions);
+            var marker = new kakao.maps.Marker({
+                position: position,
+                image: markerImage,
+                map: map
+            });
+            markers.push(marker);
+            return marker;
+        }
+
+        // 도착 마커 추가
+        function arriveMarke(y,x) {
+            // 도착 마커 이미지를 설정합니다
+            var arriveSrc = 'https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/blue_b.png'; // 마커 이미지 주소
+            var arriveSize = new kakao.maps.Size(50, 55); // 마커 크기
+            var arriveOption = {
+                offset: new kakao.maps.Point(25, 64) // 마커 이미지의 기준점 (이미지의 가운데 하단)
+            };
+
+            // 도착 마커 위치 (place.x, place.y는 위도, 경도를 의미합니다)
+            var arrivePosition = new kakao.maps.LatLng(y, x);
+
+            // 도착 마커를 생성합니다
+            var arriveMarker = new kakao.maps.Marker({
+                map: map, // 도착 마커가 지도 위에 표시되도록 설정합니다
+                position: arrivePosition, // 마커의 위치 설정
+                image: new kakao.maps.MarkerImage(arriveSrc, arriveSize, arriveOption) // 도착 마커 이미지를 설정합니다
+            });
+        }
+
+
+        // 검색된 장소를 표시하는 함수
+        function displayPlaces(places) {
+            var listEl = document.getElementById('placesList'), 
+                menuEl = document.getElementById('menu_wrap'),
+                fragment = document.createDocumentFragment(), 
+                bounds = new kakao.maps.LatLngBounds();
+
+            removeAllChildNodes(listEl);
+            removeMarker();
+
+            for (var i = 0; i < places.length; i++) {
+                var placePosition = new kakao.maps.LatLng(places[i].y, places[i].x),
+                    marker = addMarker(placePosition, i), // 마커에 인덱스를 전달하여 설정
+                    itemEl = getListItem(i, places[i]);
+
+                bounds.extend(placePosition);
+
+                (function(marker, title, position) {
+                    // 마커에 클릭 이벤트 추가
+                    kakao.maps.event.addListener(marker, 'click', function() {
+                        displayInfowindow(marker, title); // 클릭 시 정보창 표시
+                    });
+
+                    // 마커에 터치 이벤트 추가 (모바일 환경에서의 반응성 향상)
+                    kakao.maps.event.addListener(marker, 'touchstart', function() {
+                        displayInfowindow(marker, title); // 터치 시 정보창 표시
+                    });
+
+                    // 검색 결과 항목에 클릭 및 터치 이벤트 추가
+                    itemEl.onclick = function() {
+                        displayInfowindow(marker, title); // 클릭 시 정보창 표시
+                        map.setCenter(position); // 클릭 시 지도 중앙 이동
+                    };
+
+                    // 터치 이벤트 추가 (모바일 환경에서의 반응성 향상)
+                    itemEl.addEventListener('touchstart', function() {
+                        displayInfowindow(marker, title); // 터치 시 정보창 표시
+                        map.setCenter(position); // 터치 시 지도 중앙 이동
+                    });
+                })(marker, places[i].place_name, placePosition); // position 추가
+
+                fragment.appendChild(itemEl);
+            }
+
+            listEl.appendChild(fragment);
+            menuEl.scrollTop = 0;
+            map.setBounds(bounds);
+        }
+
+
+        // 검색 결과 항목을 생성하는 함수
+        function getListItem(index, places) {
+            var el = document.createElement('li'),
+                // 랜덤 숫자 생성 (1 ~ 10)
+                parkingCapacity = getRandomInt(1, 10), // 주차 가능대수
+                carsGoing = getRandomInt(1, 10); // 가고 있는 차량 수
+
+            var itemStr = '<span class="markerbg marker_' + (index + 1) + '"></span>' +
+                        '<div class="info" style="display: flex; justify-content: space-between; align-items: center;">' +
+                        '   <div>' + // 왼쪽 정렬을 위한 추가 div
+                        '       <h5>' + places.place_name + '</h5>' +
+                        '       <span>' + places.address_name + '</span>' +
+                        '       <span>' + places.phone + '</span>' +
+                        '       <span id="parkingData_' + index + '">총 주차구획 수: 불러오는 중...</span>' +
+                        '       <span>' + '주차 가능 수: ' + parkingCapacity + '</span>' +
+                        '       <span>' + '가고 있는 차량: ' + carsGoing + '</span>' +
+                        '   </div>' +
+                        '   <button class="set-destination-btn" onclick="setDestination(' + index + ')">목적지로 설정</button>' +
+                        '</div>';
+
+            el.innerHTML = itemStr;
+            el.className = 'item';
+
+            // 비동기로 주차 데이터를 가져와서 표시
+            fetchParkingData(places.address_name, index);
+
+            return el;
+        }
+
+        // 비동기적으로 주차 데이터를 가져오는 함수
+        function fetchParkingData(parkingAddress, index) {
+            var addressToSearch = parkingAddress.toLowerCase();
+            var removeDaejeon = addressToSearch.replace('대전', '').trim();
+
+            var xhr = new XMLHttpRequest();
+            var url = 'http://apis.data.go.kr/6300000/openapi/rest2/getParkingInfoList.do';
+            var queryParams = '?' + encodeURIComponent('serviceKey') + '=' + 'W%2Fr8i%2FjrAsidCwyXOr9lD%2Fgd3LdCUw6dbsvvrM9zHsZnNI89o%2FPD4DDRabNuLpDezV4pe5p%2F3Z7QJgpt6mSPUA%3D%3D';
+            queryParams += '&' + encodeURIComponent('numOfRows') + '=' + encodeURIComponent('200'); // 100개 항목을 가져오도록 설정
+            queryParams += '&' + encodeURIComponent('pageNo') + '=' + encodeURIComponent('1');
+
+            xhr.open('GET', url + queryParams);
+            xhr.onreadystatechange = function () {
+                if (this.readyState == 4) {
+                    if (this.status == 200) {
+                        // XML 응답을 JavaScript로 파싱
+                        var parser = new DOMParser();
+                        var xmlDoc = parser.parseFromString(this.responseText, "text/xml");
+
+                        // PARKING 태그들을 배열로 가져오기
+                        var parkingList = xmlDoc.getElementsByTagName("PARKING");
+                        var found = false; // 주차장 검색 결과 여부
+
+                        // 주소가 "대전"을 제외한 나머지로 검색
+                        var inputAddress = removeDaejeon.toLowerCase(); // 소문자로 변경하여 대소문자 구분 없애기
+
+                        for (var i = 0; i < parkingList.length; i++) {
+                            var name = parkingList[i].getElementsByTagName("NAME")[0].textContent;
+                            var address = parkingList[i].getElementsByTagName("ADDR01")[0].textContent;
+
+                            // 주차장의 주소가 입력된 주소를 포함하는지 확인
+                            if (address.toLowerCase().includes(inputAddress)) {
+                                var totalLots = parkingList[i].getElementsByTagName("TOTAL_PARKING_LOT")[0].textContent;
+                                found = true;
+
+                                // 해당 주차장의 주차 가능 대수를 업데이트
+                                document.getElementById("parkingData_" + index).innerText = "총 주차구획 수: " + totalLots;
+                            }
+                        }
+
+                        if (!found) {
+                            // 해당 주소에 맞는 주차장이 없으면 "주차장 정보 없음" 표시
+                            document.getElementById("parkingData_" + index).innerText = "총 주차구획 수: 정보가 없습니다.";
+                        }
+                    } else {
+                        alert('데이터를 불러오는 데 실패했습니다. 상태: ' + this.status);
+                    }
+                }
+            };
+
+            xhr.send();
+        }
+
+
+        // 랜덤 정수를 생성하는 함수
+        function getRandomInt(min, max) {
+            return Math.floor(Math.random() * (max - min + 1)) + min;
+        }
+
+        // 모든 마커를 제거하는 함수
+        function removeMarker() {
+            for (var i = 0; i < markers.length; i++) {
+                markers[i].setMap(null);
+            }
+            markers = [];
+        }
+
+        // 리스트의 모든 노드를 제거하는 함수
+        function removeAllChildNodes(el) {
+            while (el.hasChildNodes()) {
+                el.removeChild(el.lastChild);
+            }
+        }
+
+        // 정보창을 표시하는 함수
+        function displayInfowindow(marker, videoUrl) {
+            // 동영상 HTML 요소와 닫기 버튼 생성
+            var content = '<div style="padding:5px; position: relative;">' +
+                        '   <button style="position: absolute; top: 5px; right: 5px; z-index: 1;" onclick="closeInfowindow()">닫기</button>' +
+                        '   <video width="300" controls>' +  // 비디오 크기 조정 및 컨트롤 바 추가
+                        '       <source src="' + videoUrl + '" type="video/mp4">' +  // 비디오 소스 설정
+                        '       Your browser does not support the video tag.' +
+                        '   </video>' +
+                        '</div>';
+            infowindow.setContent(content);
+            infowindow.open(map, marker);
+        }
+        // 정보창을 닫는 함수
+        function closeInfowindow() {
+            infowindow.close();
+        }
+    </script>
+</body>
+</html>
